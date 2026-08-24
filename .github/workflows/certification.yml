@@ -1,0 +1,74 @@
+# DomainCraft Bridge Certification (C# per-language TCK) — CI Template
+#
+# Certifies the thin `csharp-core` bridge directly: generates kitchen-sink.yaml
+# with this bridge into tck/generated, compiles the generated sources into a
+# hand-written xunit project, and runs wire + query contract:
+#
+#   * `dotnet build` — the generated C# must compile (type wire);
+#   * `dotnet test`  — enum wire values, JSON converter, entity type surface,
+#     the path:op:value grammar, sort/LINQ translation, ListQuery + PagedResult.
+#
+# No database, no ASP.NET stack — `csharp-domain`/`csharp-efcore`/`csharp-rest`
+# (the server chain) are certified by the backend k6 suite
+# (DomainCraft/compliance-suite/).
+name: Bridge Certification (C# per-language TCK)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  # Core repo ref to checkout (branch or tag). Pin to a release tag to lock the
+  # TCK version, or leave `main` to always run against the latest.
+  CORE_VERSION: main
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout the bridge (templates + tck/) under test.
+      - name: Checkout Bridge
+        uses: actions/checkout@v4
+
+      # 2. Checkout the DomainCraft core (compliance-suite + kitchen-sink).
+      - name: Checkout Core
+        uses: actions/checkout@v4
+        with:
+          repository: DomainCraft/DomainCraft
+          path: core
+          ref: ${{ env.CORE_VERSION }}
+
+      # 3. Set up Go (the core requires Go 1.25+, see go.mod).
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      # 4. Install the CLI from the matching release.
+      - name: Install DomainCraft CLI
+        run: |
+          go install github.com/DomainCraft/DomainCraft/cmd/domaincraft@${{ env.CORE_VERSION == 'main' && 'latest' || env.CORE_VERSION }}
+
+      # 5. .NET SDK for build + test (the bridge targets net10.0).
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # 6. Generate the C# core from kitchen-sink.yaml with THIS bridge
+      #    (csharp-core alone — no domain/efcore/rest layers involved).
+      - name: Generate Code
+        run: |
+          domaincraft generate \
+            --domain ./core/compliance-suite/kitchen-sink.yaml \
+            --bridge . \
+            --output ./tck/generated \
+            --non-interactive
+
+      # 7. Compile the generated sources + the hand-written oracle, run it.
+      #    The generated dir is gitignored and regenerated on every run.
+      - name: Build and Test
+        working-directory: ./tck
+        run: dotnet test --nologo
