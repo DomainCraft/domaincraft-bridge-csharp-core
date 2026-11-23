@@ -1,5 +1,12 @@
 # DomainCraft C# Core — `csharp-core`
 
+[![Moved to the monorepo](https://img.shields.io/badge/moved%20to-Fellmonkey%2FDomainCraft-orange)](https://github.com/Fellmonkey/DomainCraft)
+> This bridge is now developed at Fellmonkey/DomainCraft under bridges/(family)/(layer).
+> 
+> This repository is frozen and kept only so existing owner/repo references keep working.
+> 
+> Use domaincraft generate --bridge (bridge-id) from the new release.
+
 The thin language core for C#. Every C# stack starts here.
 
 `csharp-core` compiles your `domain.yaml` into the only code every C# stack needs — entity shapes, enum wire values, query schema and the permission matrix — and nothing else. No `DbContext`, no services, no controllers. Those live in the layers above.
